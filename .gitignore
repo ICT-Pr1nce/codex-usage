@@ -1,0 +1,10 @@
+/work/
+/.tools/
+/CodexQuota*/
+*.zip
+/bin/
+/build-temp/
+*.obj
+*.lib
+*.exp
+*.pdb
