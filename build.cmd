@@ -4,9 +4,13 @@ cd /d "%~dp0"
 set "TEMP=%~dp0build-temp"
 set "TMP=%TEMP%"
 if not exist "%TEMP%" mkdir "%TEMP%"
+if defined VSROOT goto compiler_ready
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
-for /f "usebackq tokens=*" %%i in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSROOT=%%i"
-if not defined VSROOT exit /b 1
+if not exist "%VSWHERE%" goto compiler_missing
+"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath > "%TEMP%\vsroot.txt"
+set /p VSROOT=<"%TEMP%\vsroot.txt"
+:compiler_ready
+if not exist "%VSROOT%\VC\Auxiliary\Build\vcvarsall.bat" goto compiler_missing
 call :build x86
 if errorlevel 1 exit /b 1
 call :build x64
@@ -28,3 +32,7 @@ RenderTests.exe
 if errorlevel 1 (popd & exit /b 1)
 popd
 exit /b 0
+
+:compiler_missing
+echo MSVC C++ Build Tools not found. Install them or set VSROOT to the installation directory.
+exit /b 1
