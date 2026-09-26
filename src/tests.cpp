@@ -55,11 +55,13 @@ int wmain(int argc,wchar_t** argv){
     w.remaining=76.8;assert(Percent(w,false)==L"76%");
     w.remaining=20;assert(QuotaAlert(w,true)==Alert::Normal);
     w.remaining=19.9;assert(QuotaAlert(w,true)==Alert::Warning);
-    w.remaining=0.1;assert(QuotaAlert(w,true)==Alert::Warning);
-    w.remaining=0;assert(QuotaAlert(w,true)==Alert::Exhausted);
+    w.remaining=10;assert(QuotaAlert(w,true)==Alert::Warning);
+    w.remaining=9.9;assert(QuotaAlert(w,true)==Alert::Critical);
+    w.remaining=0.1;assert(QuotaAlert(w,true)==Alert::Critical);
+    w.remaining=0;assert(QuotaAlert(w,true)==Alert::Critical);
     assert(QuotaAlert(w,false)==Alert::Normal);w.available=false;assert(QuotaAlert(w,true)==Alert::Normal);
-    auto warning=DisplayFrame{};warning.alert=Alert::Warning;assert(FrameText(warning)==RGB(0,0,0));
-    warning.alert=Alert::Exhausted;assert(FrameText(warning)==RGB(255,255,255));
+    auto warning=DisplayFrame{};warning.alert=Alert::Warning;assert(FrameText(warning)==RGB(255,255,255));
+    warning.alert=Alert::Critical;assert(FrameText(warning)==RGB(255,255,255));
 
     assert(Countdown(0,100)==L"N/A");assert(Countdown(100,100)==L"0d 0h");assert(Countdown(99,100)==L"0d 0h");assert(Countdown(3699,100)==L"0d 0h");assert(Countdown(3700,100)==L"0d 1h");assert(Countdown(100+86400+23*3600,100)==L"1d 23h");assert(Countdown(100+7*86400,100)==L"7d 0h");
     auto window=[](double used,int mins){return Json{{"usedPercent",used},{"windowDurationMins",mins},{"resetsAt",1900000000}};};
@@ -84,4 +86,5 @@ int wmain(int argc,wchar_t** argv){
     }
     Render(p,argc>3 && std::wstring(argv[2])==L"--live"?argv[3]:nullptr);
     FreeLibrary(dll);std::cout<<"PASS: six ABI items, stable IDs, four single/two double, countdown, quota mapping, render clipping at 18/28/40/60px\n";
+    return 0;
 }

@@ -138,7 +138,7 @@ class Plugin:public ITMPlugin {
         process.h=pi.hProcess;Handle thread;thread.h=pi.hThread;
         if(!AssignProcessToJobObject(job.h,process.h) || ResumeThread(thread.h)==static_cast<DWORD>(-1)){Fail(L"无法运行查询进程");return;}
         stage=1;deadline=GetTickCount64()+45000;status=L"正在查询官方账号额度";
-        if(!Send("{\"id\":1,\"method\":\"initialize\",\"params\":{\"clientInfo\":{\"name\":\"trafficmonitor_codex_quota\",\"version\":\"1.2.1\"}}}\n"))Fail(L"初始化通信失败");
+        if(!Send("{\"id\":1,\"method\":\"initialize\",\"params\":{\"clientInfo\":{\"name\":\"trafficmonitor_codex_quota\",\"version\":\"1.2.2\"}}}\n"))Fail(L"初始化通信失败");
     }
     void Receive(const Json& message){
         if(!message.is_object())return;
@@ -178,7 +178,7 @@ public:
     std::array<std::wstring,2> Block(int window){std::lock_guard<std::mutex> g(lock);return {std::wstring(window?L"week: ":L"5h: ")+ValueLocked(window,false),ValueLocked(window,true)};}
     COLORREF Color(bool dark){std::lock_guard<std::mutex> g(lock);return hasColor?textColor:dark?RGB(240,240,240):RGB(20,20,20);}
     void OnExtenedInfo(ExtendedInfoIndex index,const wchar_t* data)override{if(index==EI_VALUE_TEXT_COLOR && data){std::lock_guard<std::mutex> g(lock);textColor=wcstoul(data,nullptr,10);hasColor=true;}}
-    const wchar_t* GetInfo(PluginInfoIndex n)override{switch(n){case TMI_NAME:return L"Codex Quota";case TMI_DESCRIPTION:return L"真实额度、重置倒计时：四个单行项和两个双行块";case TMI_AUTHOR:return L"CodexQuota contributors";case TMI_COPYRIGHT:return L"MIT (original code)";case TMI_VERSION:return L"1.2.1";case TMI_URL:return L"https://learn.chatgpt.com/docs/app-server";default:return L"";}}
+    const wchar_t* GetInfo(PluginInfoIndex n)override{switch(n){case TMI_NAME:return L"Codex Quota";case TMI_DESCRIPTION:return L"真实额度、重置倒计时：四个单行项和两个双行块";case TMI_AUTHOR:return L"CodexQuota contributors";case TMI_COPYRIGHT:return L"MIT (original code)";case TMI_VERSION:return L"1.2.2";case TMI_URL:return L"https://learn.chatgpt.com/docs/app-server";default:return L"";}}
     const wchar_t* GetTooltipInfo()override{
         thread_local std::wstring text;std::lock_guard<std::mutex> g(lock);text.clear();
         for(int i=0;i<2;++i){

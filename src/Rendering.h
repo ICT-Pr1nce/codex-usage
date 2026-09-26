@@ -7,8 +7,8 @@ struct DisplayFrame {
     Alert alert=Alert::Normal;
     COLORREF normalText=RGB(240,240,240);
 };
-inline COLORREF AlertBackground(Alert a) { return a==Alert::Exhausted?RGB(196,43,28):RGB(255,193,7); }
-inline COLORREF FrameText(const DisplayFrame& f) { return f.alert==Alert::Exhausted?RGB(255,255,255):f.alert==Alert::Warning?RGB(0,0,0):f.normalText; }
+inline COLORREF AlertBackground(Alert a) { return a==Alert::Critical?RGB(196,43,28):RGB(255,193,7); }
+inline COLORREF FrameText(const DisplayFrame& f) { return f.alert!=Alert::Normal?RGB(255,255,255):f.normalText; }
 inline void PaintFrame(HDC dc,int x,int y,int w,int h,const DisplayFrame& frame) {
     if(!dc || w<=0 || h<=1)return;
     int saved=SaveDC(dc);if(!saved)return;

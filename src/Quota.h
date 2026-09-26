@@ -52,11 +52,11 @@ inline const wchar_t* ItemId(int n) {
 }
 
 // Display mode never changes the alert threshold, which uses server usage.
-enum class Alert { Normal, Warning, Exhausted };
+enum class Alert { Normal, Warning, Critical };
 inline Alert QuotaAlert(const Window& w,bool fresh) {
     if(!fresh || !w.available) return Alert::Normal;
     double used=100.0-w.remaining;
-    return used>=100.0?Alert::Exhausted:used>80.0?Alert::Warning:Alert::Normal;
+    return used>90.0?Alert::Critical:used>80.0?Alert::Warning:Alert::Normal;
 }
 inline std::wstring Percent(const Window& w,bool showUsed) {
     double value=std::clamp(showUsed?100.0-w.remaining:w.remaining,0.0,100.0);

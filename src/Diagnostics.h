@@ -21,7 +21,7 @@ inline void Diagnostic(const char* event,Json fields=Json::object()) noexcept {
         if(!ec && size>1024*1024){auto previous=path;previous+=L".1";MoveFileExW(path.c_str(),previous.c_str(),MOVEFILE_REPLACE_EXISTING);}
         SYSTEMTIME now{};GetSystemTime(&now);char date[64]{};
         sprintf_s(date,"%04u-%02u-%02uT%02u:%02u:%02u.%03uZ",now.wYear,now.wMonth,now.wDay,now.wHour,now.wMinute,now.wSecond,now.wMilliseconds);
-        fields["time_utc"]=date;fields["event"]=event;fields["version"]="1.2.1";fields["pid"]=GetCurrentProcessId();
+        fields["time_utc"]=date;fields["event"]=event;fields["version"]="1.2.2";fields["pid"]=GetCurrentProcessId();
         auto line=fields.dump()+"\n";
         HANDLE file=CreateFileW(path.c_str(),FILE_APPEND_DATA,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
         if(file!=INVALID_HANDLE_VALUE){DWORD count=0;WriteFile(file,line.data(),static_cast<DWORD>(line.size()),&count,nullptr);CloseHandle(file);}
