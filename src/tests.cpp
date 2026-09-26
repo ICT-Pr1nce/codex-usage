@@ -8,6 +8,7 @@
 #include <thread>
 #include "Quota.h"
 #include "Rendering.h"
+#include "Diagnostics.h"
 #include "PluginInterface.h"
 static void Print(const std::wstring& s){int n=WideCharToMultiByte(CP_UTF8,0,s.c_str(),-1,nullptr,0,nullptr,nullptr);std::string b(n,0);WideCharToMultiByte(CP_UTF8,0,s.c_str(),-1,b.data(),n,nullptr,nullptr);std::cout<<b.c_str()<<std::endl;}
 static void Render(ITMPlugin* p,const wchar_t* file){
@@ -46,6 +47,10 @@ static void Settings(ITMPlugin* p){
 }
 int wmain(int argc,wchar_t** argv){
     if(argc<2)return 2;
+    auto errorSummary=RpcErrorSummary(Json{{"code",-32000},{"message","401 auth token secret-test-value"}});
+    assert(errorSummary["rpc_code"]==-32000 && errorSummary.dump().find("secret-test-value")==std::string::npos);
+    assert(errorSummary["error_tags"].size()==3);
+
     Window w{true,76,1900000000};assert(Percent(w,false)==L"76%" && Percent(w,true)==L"24%");
     w.remaining=76.8;assert(Percent(w,false)==L"76%");
     w.remaining=20;assert(QuotaAlert(w,true)==Alert::Normal);

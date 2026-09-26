@@ -8,6 +8,8 @@
 #include "PluginInterface.h"
 #include "Quota.h"
 #include "Rendering.h"
+#include "Diagnostics.h"
+#include <shellapi.h>
 namespace fs=std::filesystem;
 static HMODULE moduleHandle;
 struct Handle {
@@ -94,12 +96,12 @@ class Plugin:public ITMPlugin {
     std::string pending;
     unsigned interval=60;
     bool showUsed=GetPrivateProfileIntW(L"CodexQuota",L"ShowUsed",0,ActiveConfig().c_str())!=0;
-    ULONGLONG deadline=0,nextPoll=0,fetchedTick=0;
+    ULONGLONG deadline=0,nextPoll=0,fetchedTick=0,queryStarted=0;
     long long fetchedTime=0;
     std::wstring status=L"等待首次查询";
     COLORREF textColor=RGB(0,0,0);bool hasColor=false;
     void Stop(){job.close();if(process.h)TerminateProcess(process.h,0);input.close();output.close();process.close();stage=0;pending.clear();}
-    void Fail(const wchar_t* why){good=false;quota={};status=why;Stop();nextPoll=GetTickCount64()+static_cast<ULONGLONG>(interval)*1000;}
+    void Fail(const wchar_t* why){Diagnostic("query_failed",{{"phase",stage},{"reason",Utf8(why)},{"last_win32",GetLastError()},{"elapsed_ms",queryStarted?GetTickCount64()-queryStarted:0}});good=false;quota={};status=why;Stop();nextPoll=GetTickCount64()+static_cast<ULONGLONG>(interval)*1000;}
     fs::path FindCodex(){
         interval=Refresh();showUsed=GetPrivateProfileIntW(L"CodexQuota",L"ShowUsed",0,ActiveConfig().c_str())!=0;auto configured=ConfigPath();std::error_code ec;
         if(!configured.empty()){fs::path p(configured);return p.is_absolute() && p.extension()==L".exe" && fs::is_regular_file(p,ec)?p:fs::path{};}
@@ -113,6 +115,8 @@ class Plugin:public ITMPlugin {
     }
     bool Send(const std::string& line){DWORD count=0;return WriteFile(input.h,line.data(),static_cast<DWORD>(line.size()),&count,nullptr) && count==line.size();}
     void Start(){
+        queryStarted=GetTickCount64();
+        Diagnostic("query_start",{{"http_proxy_present",!Env(L"HTTP_PROXY").empty()},{"https_proxy_present",!Env(L"HTTPS_PROXY").empty()},{"all_proxy_present",!Env(L"ALL_PROXY").empty()},{"custom_codex_home",!Env(L"CODEX_HOME").empty()}});
         auto exe=FindCodex();if(exe.empty()){Fail(L"找不到 codex.exe；请在插件选项中设置程序路径");return;}
         SECURITY_ATTRIBUTES sa{sizeof(sa),nullptr,TRUE};Handle childInput,childOutput,childError;
         if(!CreatePipe(&childInput.h,&input.h,&sa,0) || !CreatePipe(&output.h,&childOutput.h,&sa,0)){Fail(L"无法创建通信管道");return;}
@@ -134,15 +138,15 @@ class Plugin:public ITMPlugin {
         process.h=pi.hProcess;Handle thread;thread.h=pi.hThread;
         if(!AssignProcessToJobObject(job.h,process.h) || ResumeThread(thread.h)==static_cast<DWORD>(-1)){Fail(L"无法运行查询进程");return;}
         stage=1;deadline=GetTickCount64()+45000;status=L"正在查询官方账号额度";
-        if(!Send("{\"id\":1,\"method\":\"initialize\",\"params\":{\"clientInfo\":{\"name\":\"trafficmonitor_codex_quota\",\"version\":\"1.2.0\"}}}\n"))Fail(L"初始化通信失败");
+        if(!Send("{\"id\":1,\"method\":\"initialize\",\"params\":{\"clientInfo\":{\"name\":\"trafficmonitor_codex_quota\",\"version\":\"1.2.1\"}}}\n"))Fail(L"初始化通信失败");
     }
     void Receive(const Json& message){
         if(!message.is_object())return;
         auto id=message.find("id");if(id==message.end() || !id->is_number_integer() || *id!=(stage==1?1:2))return;
-        if(message.contains("error")){Fail(L"查询失败；请检查 ChatGPT 登录、网络及账号权限（API Key 不支持）");return;}
+        if(message.contains("error")){auto details=RpcErrorSummary(message["error"]);details["phase"]=stage;Diagnostic("rpc_error",details);Fail(L"查询失败；请检查 ChatGPT 登录、网络及账号权限（API Key 不支持）");return;}
         auto result=message.find("result");if(result==message.end()){Fail(L"账号接口响应无效");return;}
-        if(stage==1){stage=2;if(!Send("{\"method\":\"initialized\",\"params\":{}}\n{\"id\":2,\"method\":\"account/rateLimits/read\"}\n"))Fail(L"查询通信失败");}
-        else{quota=ParseQuota(*result);fetchedTick=GetTickCount64();fetchedTime=_time64(nullptr);good=true;status=L"真实账号数据 · account/rateLimits/read";Stop();nextPoll=fetchedTick+static_cast<ULONGLONG>(interval)*1000;}
+        if(stage==1){Diagnostic("initialized",{{"elapsed_ms",GetTickCount64()-queryStarted}});stage=2;if(!Send("{\"method\":\"initialized\",\"params\":{}}\n{\"id\":2,\"method\":\"account/rateLimits/read\"}\n"))Fail(L"查询通信失败");}
+        else{quota=ParseQuota(*result);Diagnostic("query_success",{{"elapsed_ms",GetTickCount64()-queryStarted},{"five_hour_available",quota.windows[0].available},{"weekly_available",quota.windows[1].available}});fetchedTick=GetTickCount64();fetchedTime=_time64(nullptr);good=true;status=L"真实账号数据 · account/rateLimits/read";Stop();nextPoll=fetchedTick+static_cast<ULONGLONG>(interval)*1000;}
     }
     std::wstring ValueLocked(int window,bool reset){
         if(!good)return stage?L"...":nextPoll?L"ERR":L"...";
@@ -153,6 +157,7 @@ class Plugin:public ITMPlugin {
         return Percent(w,showUsed);
     }
 public:
+    Plugin(){Diagnostic("plugin_loaded");}
     ~Plugin(){Stop();}
     IPluginItem* GetItem(int n)override{return n>=0 && n<6?&items[n]:nullptr;}
     void DataRequired()override{
@@ -173,7 +178,7 @@ public:
     std::array<std::wstring,2> Block(int window){std::lock_guard<std::mutex> g(lock);return {std::wstring(window?L"week: ":L"5h: ")+ValueLocked(window,false),ValueLocked(window,true)};}
     COLORREF Color(bool dark){std::lock_guard<std::mutex> g(lock);return hasColor?textColor:dark?RGB(240,240,240):RGB(20,20,20);}
     void OnExtenedInfo(ExtendedInfoIndex index,const wchar_t* data)override{if(index==EI_VALUE_TEXT_COLOR && data){std::lock_guard<std::mutex> g(lock);textColor=wcstoul(data,nullptr,10);hasColor=true;}}
-    const wchar_t* GetInfo(PluginInfoIndex n)override{switch(n){case TMI_NAME:return L"Codex Quota";case TMI_DESCRIPTION:return L"真实额度、重置倒计时：四个单行项和两个双行块";case TMI_AUTHOR:return L"CodexQuota contributors";case TMI_COPYRIGHT:return L"MIT (original code)";case TMI_VERSION:return L"1.2.0";case TMI_URL:return L"https://learn.chatgpt.com/docs/app-server";default:return L"";}}
+    const wchar_t* GetInfo(PluginInfoIndex n)override{switch(n){case TMI_NAME:return L"Codex Quota";case TMI_DESCRIPTION:return L"真实额度、重置倒计时：四个单行项和两个双行块";case TMI_AUTHOR:return L"CodexQuota contributors";case TMI_COPYRIGHT:return L"MIT (original code)";case TMI_VERSION:return L"1.2.1";case TMI_URL:return L"https://learn.chatgpt.com/docs/app-server";default:return L"";}}
     const wchar_t* GetTooltipInfo()override{
         thread_local std::wstring text;std::lock_guard<std::mutex> g(lock);text.clear();
         for(int i=0;i<2;++i){
@@ -196,9 +201,9 @@ public:
         frame.normalText=hasColor?textColor:dark?RGB(240,240,240):RGB(20,20,20);
         return frame;
     }
-    int GetCommandCount()override{return 1;}
-    const wchar_t* GetCommandName(int n)override{return n==0?L"立即刷新 Codex 额度":nullptr;}
-    void OnPluginCommand(int n,void*,void*)override{if(n==0){std::lock_guard<std::mutex> g(lock);nextPoll=0;}}
+    int GetCommandCount()override{return 2;}
+    const wchar_t* GetCommandName(int n)override{return n==0?L"立即刷新 Codex 额度":n==1?L"打开诊断日志":nullptr;}
+    void OnPluginCommand(int n,void*,void*)override{if(n==0){std::lock_guard<std::mutex> g(lock);nextPoll=0;}else if(n==1){Diagnostic("log_opened");auto path=DiagnosticPath();if(!path.empty())ShellExecuteW(nullptr,L"open",path.c_str(),nullptr,nullptr,SW_SHOWNORMAL);}}
     OptionReturn ShowOptionsDialog(void* parent)override{
         Options options;options.seconds=Refresh();options.path=ConfigPath();options.showUsed=GetPrivateProfileIntW(L"CodexQuota",L"ShowUsed",0,ActiveConfig().c_str())!=0;
         alignas(DWORD) unsigned char memory[512]{};auto dialog=reinterpret_cast<DLGTEMPLATE*>(memory);
