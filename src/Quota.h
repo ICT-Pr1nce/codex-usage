@@ -50,3 +50,15 @@ inline const wchar_t* ItemId(int n) {
     static const wchar_t* ids[]={L"codex_quota_5h_remaining",L"codex_quota_week_remaining",L"codex_quota_5h_reset",L"codex_quota_week_reset",L"codex_quota_5h_block",L"codex_quota_week_block"};
     return n>=0 && n<6?ids[n]:L"";
 }
+
+// Display mode never changes the alert threshold, which uses server usage.
+enum class Alert { Normal, Warning, Exhausted };
+inline Alert QuotaAlert(const Window& w,bool fresh) {
+    if(!fresh || !w.available) return Alert::Normal;
+    double used=100.0-w.remaining;
+    return used>=100.0?Alert::Exhausted:used>80.0?Alert::Warning:Alert::Normal;
+}
+inline std::wstring Percent(const Window& w,bool showUsed) {
+    double value=std::clamp(showUsed?100.0-w.remaining:w.remaining,0.0,100.0);
+    return std::to_wstring(static_cast<int>(value))+L"%";
+}

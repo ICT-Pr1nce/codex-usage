@@ -22,5 +22,9 @@ cl /nologo /std:c++17 /EHsc /O2 /MT /utf-8 ..\..\src\tests.cpp /Fe:QuotaTests.ex
 if errorlevel 1 (popd & exit /b 1)
 QuotaTests.exe CodexQuota.dll
 if errorlevel 1 (popd & exit /b 1)
+cl /nologo /std:c++17 /EHsc /O2 /MT /utf-8 ..\..\src\render_tests.cpp /Fe:RenderTests.exe /link user32.lib gdi32.lib
+if errorlevel 1 (popd & exit /b 1)
+RenderTests.exe
+if errorlevel 1 (popd & exit /b 1)
 popd
 exit /b 0
