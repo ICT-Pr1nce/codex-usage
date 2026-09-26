@@ -20,5 +20,5 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-This license covers the original CodexQuota implementation only. See the
-separate TrafficMonitor-LICENSE and nlohmann-json-LICENSE for vendored files.
+This license applies to original implementation code. Vendored files retain
+their respective licenses in TrafficMonitor-LICENSE and nlohmann-json-LICENSE.
